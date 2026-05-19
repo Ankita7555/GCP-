@@ -1,0 +1,1091 @@
+Table types in BQ : 
+
+
+
+Quotas and limits 
+
+https://cloud.google.com/bigquery/quotas
+
+
+
+
+
+
+
+
+
+BQ Architecture:
+
+
+
+Partition and Clustering
+I want to apply partition on string column which contains date in it,
+But parsing and casting is not allowed in the partition clause.
+
+CREATE TABLE `fluted-union-448405-a7.test.test_table_1`
+(
+  id INT64,
+  name STRING,
+  last_UD STRING
+)
+PARTITION BY DATE(PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S', last_UD));
+
+
+
+If you want to keep the last_UD column as a STRING but still partition the table by its date value (assuming the last_UD string is in a valid date format like 'YYYY-MM-DD'), you can use a generated column to extract the date part and partition the table based on that.
+Here’s how you can achieve this:
+Solution: Use a Generated Column for Partitioning
+You can create a generated column that extracts the date part from the last_UD string and use that column for partitioning.
+
+CREATE TABLE `fluted-union-448405-a7.test.test_table_1`
+(
+  id INT64,
+  name STRING,
+  last_UD STRING,
+  partition_date DATE GENERATED ALWAYS AS (DATE(PARSE_DATE('%Y-%m-%d', last_UD)))
+)
+PARTITION BY partition_date;
+
+
+
+
+Types of partitioning
+Integer range partitioning
+
+CREATE TABLE `fluted-union-448405-a7.test.part_4`
+(
+  sale_id INT64,
+  sale_date DATE,
+  product STRING,
+  amount FLOAT64
+)
+PARTITION BY RANGE_BUCKET(sale_id, GENERATE_ARRAY(0, 100, 10));
+
+
+
+
+INSERT INTO `fluted-union-448405-a7.test.part_4` (sale_id, sale_date, product, amount)
+VALUES
+  (5, '2023-10-01', 'Product A', 100.0),
+  (15, '2023-10-01', 'Product B', 200.0),
+  (25, '2023-10-02', 'Product C', 150.0);
+
+
+
+
+SELECT *
+FROM `fluted-union-448405-a7.test.part_4`
+WHERE sale_id BETWEEN 10 AND 19;
+
+
+—----------------------------------------------------------------------------------
+Time-unit column partitioning
+
+
+
+CREATE TABLE `fluted-union-448405-a7.test.part_1`
+(
+  sale_id INT64,
+  sale_date DATE,
+  product STRING,
+  amount FLOAT64
+)
+PARTITION BY date(sale_date);
+
+
+
+
+INSERT INTO `fluted-union-448405-a7.test.part_1` (sale_id, sale_date, product, amount)
+VALUES
+  (1, '2023-10-01', 'Product A', 100.0),
+  (2, '2023-10-01', 'Product B', 200.0),
+  (3, '2023-10-02', 'Product A', 150.0),
+  (4, '2023-10-03', 'Product C', 300.0);
+
+
+
+
+
+SELECT *
+FROM `fluted-union-448405-a7.test.part_1`
+WHERE sale_date = '2023-10-01';
+
+
+—------------------------------------------
+Ingestion time partitioning
+
+If we don't have date column but want to apply partitioned on date only 
+
+
+CREATE TABLE `fluted-union-448405-a7.test.part_2`
+(
+  sale_id INT64,
+  product STRING,
+  amount FLOAT64
+)
+PARTITION BY DATE(_PARTITIONTIME);
+
+
+INSERT INTO `fluted-union-448405-a7.test.part_2` (sale_id, product, amount)
+VALUES
+  (1, 'Product A', 100.0),
+  (2, 'Product B', 200.0),
+  (3, 'Product C', 150.0);
+
+
+
+
+SELECT *
+FROM `fluted-union-448405-a7.test.part_2`
+WHERE _PARTITIONTIME = '2025-03-02';
+
+
+—------------------------
+
+
+CREATE TABLE `fluted-union-448405-a7.test.part_5`
+(
+  sale_id INT64,
+  sale_date DATE,
+  product STRING,
+  amount FLOAT64
+)
+PARTITION BY sale_date
+OPTIONS (
+  partition_expiration_days = 365, -- Automatically delete partitions older than 365 days
+  require_partition_filter = TRUE -- Require a filter on `sale_date` for all queries
+);
+
+
+________________________________
+To see partition of table :
+
+
+SELECT
+  table_name,
+  partition_expiration_days,
+  require_partition_filter
+FROM
+  `your_dataset.INFORMATION_SCHEMA.TABLES`
+WHERE
+  table_name = 'sales_partitioned';
+
+
+
+
+Info schema 
+
+select * from `test.INFORMATION_SCHEMA.PARTITIONS` where table_name ='part_1'
+—--------------------------------------------------------------
+
+
+Summary of Limitations:
+Max number of partitions: Up to 4,000 partitions for date/timestamp or integer partitioning.
+Partition granularity: Can only partition by DATE, TIMESTAMP, DATETIME, or INTEGER.
+Partition scan limit: Up to 1,000 partitions can be scanned per query.
+Expiration limits: Partition expiration can only be set for the entire table (up to 30,000 days).
+NULL values: May cause issues with partitioning and need to be handled carefully.
+Performance overhead: Partitioning may be inefficient for small tables.
+Partitioning cannot be modified: You cannot change partitioning after creating the table.
+BigQuery creates an unnamed partition (also called the __UNPARTITIONED__ partition) to store this data.can contain NULL data as well
+only one column can be used for partitioning a table at a time.
+Clustering: Up to 4 clustering columns can be used alongside partitioning
+
+
+
+
+—------------------------------------------
+Best Practices for Clustering
+Choose High-Cardinality Columns: Columns with many distinct values (e.g., customer_id) are good candidates for clustering.
+      2. Combine with Partitioning
+       3.Limit Clustering Columns: Use up to 4 columns for clustering to avoid diminishing returns.
+4.Avoid Frequent Updates: Clustering works best for tables with infrequent updates, as BigQuery needs to reorganize data when changes occur.
+
+Restrictions : 
+Only 4 column
+Unsupported data types:
+     ARRAY
+STRUCT
+JSON
+FLOAT64(floating-point numbers are not supported for clustering)
+
+Clustering is not supported for external tables 
+Clustering does not affect time travel (the ability to query historical data).
+
+Clustering
+
+CREATE TABLE `your_dataset.sales_partitioned_clustered`
+(
+  sale_id INT64,
+  sale_date DATE,
+  product STRING,
+  amount FLOAT64
+)
+PARTITION BY sale_date
+CLUSTER BY product
+OPTIONS (
+  partition_expiration_days = 365, -- Automatically delete old partitions
+  require_partition_filter = TRUE -- Require a filter on `sale_date`
+);
+
+
+—---------------------------------------------------
+CREATE MATERIALIZED VIEW `your_dataset.sales_mv_clustered`
+AS
+SELECT sale_date, product, SUM(amount) AS total_amount
+FROM `your_dataset.sales`
+GROUP BY sale_date, product
+CLUSTER BY sale_date, product;
+
+
+Clustering is a way to group similar data together in a table based on the values of one or more columns.
+
+
+
+
+You can specify up to four clustering columns. When you specify multiple columns, the order of the columns determines how the data is sorted. For example, if the table is clustered by columns a, b and c, the data is sorted in the same order: first by column a, then by column b, and then by column c. As a best practice, place the most frequently filtered or aggregated column first.
+
+
+"Block pruning" in BigQuery refers to the process where the system skips irrelevant data blocks when querying a clustered table, significantly improving query performance by only scanning the data blocks that are directly related to the filter conditions applied in the query, effectively reducing the amount of data processed and lowering costs; essentially, BigQuery "prunes" away unnecessary data blocks based on the clustering columns specified in the table structure. 
+
+
+—----------------------------------------------------
+
+
+CREATE TABLE `fluted-union-448405-a7.test.clust1`
+(
+  sale_id INT64,
+  sale_date DATE,
+  product STRING,
+  amount FLOAT64
+)
+ CLUSTER BY sale_date, product;
+
+
+INSERT INTO `fluted-union-448405-a7.test.clust1` (sale_id, sale_date, product, amount)
+VALUES
+  (1, '2023-10-01', 'Product A', 100.0),
+  (2, '2023-10-01', 'Product B', 200.0),
+  (3, '2023-10-02', 'Product A', 150.0),
+  (4, '2023-10-03', 'Product C', 300.0);
+
+
+select * from `fluted-union-448405-a7.test.clust`
+select * from `fluted-union-448405-a7.test.clust1`
+
+
+
+
+Views and Materialized views:
+
+
+SELECT
+  table_name,
+  creation_time,
+  last_refresh_time,
+  refresh_interval_ms,
+  refresh_enabled,
+  allow_non_incremental_definition
+FROM
+  `fluted-union-448405-a7.test.INFORMATION_SCHEMA.MATERIALIZED_VIEWS`
+WHERE
+  table_name = 'my_materialized_view';
+
+
+
+You can not change the auto refresh time of Mview in BQ like Oracle , if you want to schedule on a particular time interval then you can schedule a Query through Query scheduler to delete old and create new table copy similar to Mview 
+You can change refresh time 
+
+CREATE MATERIALIZED VIEW `fluted-union-448405-a7.test.duplicate_MV`
+AS
+SELECT * FROM `fluted-union-448405-a7.test.duplicate`
+
+
+
+
+ALTER MATERIALIZED VIEW `fluted-union-448405-a7.test.duplicate_MV`
+SET OPTIONS (
+  enable_refresh = TRUE,
+  refresh_interval_minutes = 60
+);
+
+
+
+ Options 👍
+In BigQuery, when creating or altering a table, you can specify various options to control its behavior, such as partitioning, clustering, expiration, and more. Below is a comprehensive list of all available options for tables in BigQuery, along with examples of how to use them.
+
+
+Table Options in BigQuery
+1. Partitioning Options
+partition_by: Specifies the column used for partitioning.
+
+
+partition_expiration_days: Automatically deletes partitions older than the specified number of days.
+
+
+require_partition_filter: Requires queries to include a filter on the partitioning column.
+
+
+Example:
+
+
+
+
+CREATE TABLE `your_dataset.sales_partitioned`
+(
+  sale_id INT64,
+  sale_date DATE,
+  product STRING,
+  amount FLOAT64
+)
+PARTITION BY sale_date
+OPTIONS (
+  partition_expiration_days = 365,
+  require_partition_filter = TRUE
+);
+2. Clustering Options
+cluster_by: Specifies the columns used for clustering.
+
+
+Example:
+
+
+
+
+CREATE TABLE `your_dataset.sales_clustered`
+(
+  sale_id INT64,
+  sale_date DATE,
+  product STRING,
+  amount FLOAT64
+)
+CLUSTER BY product, sale_date;
+
+
+
+
+3. Expiration Options
+expiration_timestamp: Sets a specific timestamp for the table to expire.
+
+
+default_table_expiration_days: Sets the default expiration time for tables in the dataset.
+
+
+Example:
+
+
+
+
+CREATE TABLE `your_dataset.temp_table`
+(
+  id INT64,
+  name STRING
+)
+OPTIONS (
+  expiration_timestamp = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
+);
+4. Description and Labels
+description: Adds a description to the table.
+
+
+labels: Adds key-value pairs as labels to the table.
+
+
+Example:
+
+
+
+
+CREATE TABLE `your_dataset.sales`
+(
+  sale_id INT64,
+  sale_date DATE,
+  product STRING,
+  amount FLOAT64
+)
+OPTIONS (
+  description = 'Sales data for 2023',
+  labels = [('department', 'sales'), ('year', '2023')]
+);
+5. Encryption Options
+kms_key_name: Specifies the Cloud KMS key for encryption.
+
+
+Example:
+
+
+
+
+CREATE TABLE `your_dataset.encrypted_table`
+(
+  id INT64,
+  name STRING
+)
+OPTIONS (
+  kms_key_name = 'projects/your-project/locations/your-location/keyRings/your-key-ring/cryptoKeys/your-key'
+);
+
+
+
+
+6. Storage Options
+storage_format: Specifies the storage format (e.g., PARQUET, AVRO, ORC).
+
+
+Example:
+
+
+
+
+CREATE TABLE `your_dataset.parquet_table`
+(
+  id INT64,
+  name STRING
+)
+OPTIONS (
+  storage_format = 'PARQUET'
+);
+
+
+
+
+7. Friendly Name
+friendly_name: Adds a human-readable name to the table.
+
+
+Example:
+
+
+
+
+CREATE TABLE `your_dataset.sales`
+(
+  sale_id INT64,
+  sale_date DATE,
+  product STRING,
+  amount FLOAT64
+)
+OPTIONS (
+  friendly_name = 'Sales Data 2023'
+);
+
+
+
+
+8. External Table Options
+format: Specifies the format of the external data (e.g., CSV, JSON, AVRO).
+
+
+uris: Specifies the URIs of the external data files.
+
+
+Example:
+
+
+
+
+CREATE EXTERNAL TABLE `your_dataset.external_table`
+(
+  id INT64,
+  name STRING
+)
+OPTIONS (
+  format = 'CSV',
+  uris = ['gs://your-bucket/your-file.csv']
+);
+
+
+
+
+9. Default Time Zone
+default_time_zone: Sets the default time zone for timestamp columns.
+
+
+Example:
+
+
+
+
+CREATE TABLE `your_dataset.timezone_table`
+(
+  id INT64,
+  event_time TIMESTAMP
+)
+OPTIONS (
+  default_time_zone = 'America/New_York'
+);
+
+
+
+
+10. Default Collation
+default_collation: Sets the default collation for string columns.
+
+
+Example:
+
+
+
+
+CREATE TABLE `your_dataset.collation_table`
+(
+  id INT64,
+  name STRING
+)
+OPTIONS (
+  default_collation = 'en_US'
+);
+
+
+
+
+11. Maximum Staleness
+max_staleness: Specifies the maximum staleness for materialized views.
+
+
+Example:
+
+
+
+
+CREATE MATERIALIZED VIEW `your_dataset.materialized_view`
+AS
+SELECT * FROM `your_dataset.sales`
+OPTIONS (
+  max_staleness = INTERVAL 1 HOUR
+);
+
+
+
+
+
+
+These 2 are wrong because materialized views in BigQuery do not support the OPTIONS clause directly in the CREATE MATERIALIZED VIEW statement. Instead, you can set options like enable_refresh and refresh_interval_minutes using the ALTER MATERIALIZED VIEW statement after creating the view.
+
+
+12. Enable Refresh
+enable_refresh: Enables or disables automatic refresh for materialized views.
+
+
+Example:
+
+
+
+
+CREATE MATERIALIZED VIEW `your_dataset.materialized_view`
+AS
+SELECT * FROM `your_dataset.sales`
+OPTIONS (
+  enable_refresh = TRUE
+);
+
+
+
+
+
+
+13. Refresh Interval
+refresh_interval_minutes: Specifies the refresh interval for materialized views.
+
+
+Example:
+
+
+
+
+CREATE MATERIALIZED VIEW `your_dataset.materialized_view`
+AS
+SELECT * FROM `your_dataset.sales`
+OPTIONS (
+  refresh_interval_minutes = 60
+);
+
+
+
+
+Full Example with Multiple Options
+Here’s an example of creating a table with multiple options:
+
+
+
+
+CREATE TABLE `your_dataset.sales`
+(
+  sale_id INT64,
+  sale_date DATE,
+  product STRING,
+  amount FLOAT64
+)
+PARTITION BY sale_date
+CLUSTER BY product
+OPTIONS (
+  partition_expiration_days = 365,
+  require_partition_filter = TRUE,
+  description = 'Sales data for 2023',
+  labels = [('department', 'sales'), ('year', '2023')],
+  friendly_name = 'Sales Data 2023',
+  kms_key_name = 'projects/your-project/locations/your-location/keyRings/your-key-ring/cryptoKeys/your-key'
+);
+
+
+
+
+Viewing Table Options
+You can view the options for a table using the INFORMATION_SCHEMA.TABLES view:
+
+
+
+
+SELECT
+  table_name,
+  options
+FROM
+  `your_dataset.INFORMATION_SCHEMA.TABLES`
+WHERE
+  table_name = 'your_table';
+
+
+
+
+—-------------------------------------------------
+
+Unfortunately, time travel in BigQuery doesn't work with the TRUNCATE statement.
+The TRUNCATE statement in BigQuery is a DDL (Data Definition Language) operation that removes all rows from a table but does not log the row deletions for historical querying purposes. Since it doesn't leave a record of the deleted data in a way that BigQuery's time travel feature can track, you cannot use the FOR SYSTEM_TIME AS OF clause to retrieve data after a TRUNCATE operation.
+Why Does Time Travel Not Work with TRUNCATE?
+The TRUNCATE operation is a low-level operation that essentially resets the table by removing all data in it, but BigQuery doesn't preserve detailed historical records of what was deleted in this specific case.
+Time travel works by leveraging historical versions of individual rows in a table, not the entire dataset. When rows are deleted via a TRUNCATE, that operation doesn't generate a historical version of the table's rows for BigQuery to query using time travel.
+Time travel in BigQuery does not work with the DROP statement either.
+The reason for this is similar to why it doesn't work with TRUNCATE: when you drop a table (using the DROP statement), the entire table is permanently removed from BigQuery, including its schema and data. Since DROP is a DDL operation, it removes the table and its associated metadata entirely. This means that BigQuery cannot track or preserve the table's data in a way that would allow you to use time travel to access it after the drop.
+Why Time Travel Doesn't Work with DROP:
+Table Removal: DROP deletes the table and all its contents, including its schema. There's no "historical version" of the table available after it has been dropped, so it becomes impossible to query its previous state.
+Metadata Loss: Since the table is removed from the system, all associated metadata (such as the data and schema) is erased, leaving no record for BigQuery to refer to for time travel purposes.
+
+
+
+
+BQ Functions
+
+1. Aggregate Functions
+These functions perform calculations on multiple rows of data and return a single result.
+COUNT(): Returns the number of rows.
+sql
+Copy
+SELECT COUNT(*) FROM `your_project.your_dataset.your_table`
+
+
+SUM(): Returns the sum of the values in a specified column.
+sql
+Copy
+SELECT SUM(column_name) FROM `your_project.your_dataset.your_table`
+
+
+AVG(): Returns the average of the values in a specified column.
+sql
+Copy
+SELECT AVG(column_name) FROM `your_project.your_dataset.your_table`
+
+
+MIN(): Returns the minimum value in a specified column.
+sql
+Copy
+SELECT MIN(column_name) FROM `your_project.your_dataset.your_table`
+
+
+MAX(): Returns the maximum value in a specified column.
+sql
+Copy
+SELECT MAX(column_name) FROM `your_project.your_dataset.your_table`
+
+
+ARRAY_AGG(): Returns an array of values from multiple rows.
+sql
+Copy
+SELECT ARRAY_AGG(column_name) FROM `your_project.your_dataset.your_table`
+
+
+2. String Functions
+These functions operate on string data types.
+CONCAT(): Concatenates two or more strings.
+sql
+Copy
+SELECT CONCAT(column1, column2) FROM `your_project.your_dataset.your_table`
+
+
+LENGTH(): Returns the length of a string.
+sql
+Copy
+SELECT LENGTH(column_name) FROM `your_project.your_dataset.your_table`
+
+
+LOWER(): Converts a string to lowercase.
+sql
+Copy
+SELECT LOWER(column_name) FROM `your_project.your_dataset.your_table`
+
+
+UPPER(): Converts a string to uppercase.
+sql
+Copy
+SELECT UPPER(column_name) FROM `your_project.your_dataset.your_table`
+
+
+TRIM(): Removes leading and trailing spaces from a string.
+sql
+Copy
+SELECT TRIM(column_name) FROM `your_project.your_dataset.your_table`
+
+
+REGEXP_EXTRACT(): Extracts a substring from a string using a regular expression.
+sql
+Copy
+SELECT REGEXP_EXTRACT(column_name, r'(\d+)') FROM `your_project.your_dataset.your_table`
+
+
+SPLIT(): Splits a string into an array of substrings.
+sql
+Copy
+SELECT SPLIT(column_name, ',') FROM `your_project.your_dataset.your_table`
+
+
+3. Date and Time Functions
+These functions help to work with date and time values.
+CURRENT_DATE(): Returns the current date.
+sql
+Copy
+SELECT CURRENT_DATE()
+
+
+CURRENT_TIMESTAMP(): Returns the current timestamp.
+sql
+Copy
+SELECT CURRENT_TIMESTAMP()
+
+
+DATE(): Converts a string or timestamp to a date.
+sql
+Copy
+SELECT DATE('2025-01-01')
+
+
+DATE_DIFF(): Returns the difference between two dates.
+sql
+Copy
+SELECT DATE_DIFF(DATE '2025-01-01', DATE '2024-01-01', DAY)
+
+
+EXTRACT(): Extracts a part (year, month, day, etc.) from a date or timestamp.
+sql
+Copy
+SELECT EXTRACT(YEAR FROM CURRENT_DATE())
+
+
+FORMAT_TIMESTAMP(): Formats a timestamp as a string according to the specified format.
+sql
+Copy
+SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', CURRENT_TIMESTAMP())
+
+
+4. Mathematical Functions
+These functions perform mathematical operations.
+ROUND(): Rounds a number to the nearest integer or a specified number of decimal places.
+sql
+Copy
+SELECT ROUND(column_name, 2) FROM `your_project.your_dataset.your_table`
+
+
+FLOOR(): Returns the largest integer less than or equal to a given value.
+sql
+Copy
+SELECT FLOOR(column_name) FROM `your_project.your_dataset.your_table`
+
+
+CEIL() or CEILING(): Returns the smallest integer greater than or equal to a given value.
+sql
+Copy
+SELECT CEIL(column_name) FROM `your_project.your_dataset.your_table`
+
+
+ABS(): Returns the absolute value of a number.
+sql
+Copy
+SELECT ABS(column_name) FROM `your_project.your_dataset.your_table`
+
+
+POWER(): Raises a number to a specified power.
+sql
+Copy
+SELECT POWER(column_name, 2) FROM `your_project.your_dataset.your_table`
+
+
+SQRT(): Returns the square root of a number.
+sql
+Copy
+SELECT SQRT(column_name) FROM `your_project.your_dataset.your_table`
+5. Window Functions
+These functions allow you to perform calculations across rows related to the current row.
+ROW_NUMBER(): Assigns a unique row number to each row within a partition.
+sql
+Copy
+SELECT column_name, ROW_NUMBER() OVER (ORDER BY column_name) FROM `your_project.your_dataset.your_table`
+
+
+RANK(): Assigns a rank to each row within a partition, with gaps in ranking for ties.
+sql
+Copy
+SELECT column_name, RANK() OVER (ORDER BY column_name) FROM `your_project.your_dataset.your_table`
+
+
+DENSE_RANK(): Similar to RANK(), but no gaps in ranking for ties.
+sql
+Copy
+SELECT column_name, DENSE_RANK() OVER (ORDER BY column_name) FROM `your_project.your_dataset.your_table`
+
+
+NTILE(): Divides rows into a specified number of buckets.
+sql
+Copy
+SELECT column_name, NTILE(4) OVER (ORDER BY column_name) FROM `your_project.your_dataset.your_tab
+6. Null Handling Functions
+These functions help to deal with NULL values in the data.
+IFNULL(): Replaces NULL with a specified value.
+sql
+Copy
+SELECT IFNULL(column_name, 'default_value') FROM `your_project.your_dataset.your_table`
+
+
+COALESCE(): Returns the first non-NULL value in a list of expressions.
+sql
+Copy
+SELECT COALESCE(column1, column2, 'default_value') FROM `your_project.your_dataset.your_table`
+
+
+ISNULL(): Checks whether a value is NULL.
+sql
+Copy
+SELECT ISNULL(column_name) FROM `your_project.your_dataset.your_table`
+
+
+7. Array Functions
+These functions help work with arrays in BigQuery.
+ARRAY_LENGTH(): Returns the length of an array.
+sql
+Copy
+SELECT ARRAY_LENGTH(column_name) FROM `your_project.your_dataset.your_table`
+
+
+ARRAY_AGG(): Returns an array of values.
+sql
+Copy
+SELECT ARRAY_AGG(column_name) FROM `your_project.your_dataset.your_table`
+
+
+ARRAY_CONTAINS(): Checks if an array contains a specific element.
+sql
+Copy
+SELECT ARRAY_CONTAINS(column_name, 'value') FROM `your_project.your_dataset.your_table`
+
+
+8. JSON Functions
+These functions help you interact with JSON data.
+JSON_EXTRACT(): Extracts a value from a JSON string using a JSONPath expression.
+sql
+Copy
+SELECT JSON_EXTRACT(json_column, '$.field_name') FROM `your_project.your_dataset.your_table`
+
+
+JSON_EXTRACT_SCALAR(): Extracts a scalar value from a JSON string.
+sql
+Copy
+SELECT JSON_EXTRACT_SCALAR(json_column, '$.field_name') FROM `your_project.your_dataset.your_tabl
+
+
+To identify duplicates 
+Always use row_number() do not use dense_ranek()
+
+
+select * from (
+select id,name,email, dense_rank() over ( partition by id  order by id)  rk from `fluted-union-448405-a7.test.duplicate` ) where rk>1
+order by id
+
+
+—---------------------------
+WITH duplicates AS (
+  SELECT
+    id,
+    name,
+    email,
+    ROW_NUMBER() OVER (PARTITION BY name, email ORDER BY id) AS row_num
+  FROM
+   `fluted-union-448405-a7.test.duplicate`
+)
+SELECT *
+FROM duplicates
+WHERE row_num > 1;
+—------------------------------------
+
+
+
+
+
+
+One more important syntax: 
+
+
+DELETE from staging_cnsmr_diary_mgmt.bq_cust_diary_event    
+WHERE (cust_event_id,create_ts) in (SELECT AS STRUCT cust_event_id,create_ts    
+FROM (SELECT cust_event_id,create_ts, ROW_NUMBER() OVER (PARTITION BY cust_event_id ORDER BY create_ts desc) AS r    
+FROM staging_cnsmr_diary_mgmt.bq_cust_diary_event as d)     WHERE r>1)
+
+—-----------------------------------
+
+Select * from (
+Select id , name , row_number() over (partitioned by id order by id ) as rk
+From table ) where rk >1
+
+—-------------------------------------
+
+EXTERNAL tables 
+
+
+
+-- CSV file
+CREATE EXTERNAL TABLE `your_dataset.external_csv_table`
+OPTIONS (
+  format = 'CSV',
+  uris = ['gs://your-bucket/your-csv-file.csv'],
+  field_delimiter = ',',
+  skip_leading_rows = 1
+);
+
+
+================  GZIP
+CREATE EXTERNAL TABLE `your_project.your_dataset.your_table`
+OPTIONS (
+  format = 'CSV',
+  uris = ['gs://your-bucket/path/to/file/*.csv.gz'],
+  compression = 'GZIP'
+)
+=========================
+
+
+-- JSON file
+CREATE EXTERNAL TABLE `your_dataset.external_json_table`
+OPTIONS (
+  format = 'JSON',
+  uris = ['gs://your-bucket/your-json-file.json'],
+  compression = 'GZIP'
+);
+
+
+-- Parquet file
+CREATE EXTERNAL TABLE `your_dataset.external_parquet_table`
+OPTIONS (
+  format = 'PARQUET',
+  uris = ['gs://your-bucket/your-parquet-file.parquet']
+);
+
+
+—--------------------------
+
+
+CREATE EXTERNAL TABLE `your_project.your_dataset.your_table`
+OPTIONS (
+  format = 'PARQUET',
+  uris = ['gs://your-bucket/path/to/data/*.parquet']
+)
+PARTITION BY DATE(your_partition_column)
+CLUSTER BY your_cluster_column_1, your_cluster_column_2;
+
+
+—----------------------------------------------
+Json:
+[ { "user_id": 1, "user_info": { "name": "John Doe", "email": "john.doe@example.com" }, "events": [ {"event_type": "login", "timestamp": "2025-01-01T10:00:00Z"}, {"event_type": "purchase", "timestamp": "2025-01-01T11:00:00Z"} ] }, { "user_id": 2, "user_info": { "name": "Jane Smith", "email": "jane.smith@example.com" }, "events": [ {"event_type": "login", "timestamp": "2025-02-01T10:00:00Z"} ] } ]
+
+
+
+
+
+
+CREATE EXTERNAL TABLE `your_project.your_dataset.your_table`
+OPTIONS (
+  format = 'JSON',
+  uris = ['gs://your-bucket/path/to/file/*.json']
+)
+AS
+SELECT
+  user_id,
+  user_info.name AS user_name,
+  user_info.email AS user_email,
+  event.event_type AS event_type,
+  event.timestamp AS event_timestamp
+FROM
+  `your_project.your_dataset.your_table`,
+  UNNEST(events) AS event;
+
+
+
+Question: Can you insert, update, or delete data in an external table? Why or why not?
+Answer: No, external tables are read-only. You cannot perform insert, update, or delete operations on an external table. To modify the data, you must update the source files in Google Cloud Storage and recreate the external table.
+gs://your-bucket/data/year=2023/month=10/file.parquet gs://your-bucket/data/year=2023/month=11/file.parquet gs://your-bucket/data/year=2024/month=01/file.parquet
+
+
+
+
+CREATE EXTERNAL TABLE `your_project.your_dataset.your_table`
+OPTIONS (
+  format = 'PARQUET',
+  uris = ['gs://your-bucket/data/*/*.parquet'],
+  partitioned_by = ['year', 'month']
+)
+
+—--------------------------------------------------------------
+
+{
+  "name": "Alice",
+  "age": 30,
+  "address": {
+    "city": "New York",
+    "zip": "10001"
+  },
+  "orders": [
+    {"id": 1, "amount": 100},
+    {"id": 2, "amount": 200}
+  ]
+}
+
+
+SELECT
+  name,
+  address.city,
+  order.id,
+  order.amount
+FROM
+  `your_dataset.external_table`,
+  UNNEST(orders) AS order;
+
+—-------------------------------------------------------------------
+
+
+
+
+CREATE EXTERNAL TABLE my_dataset.my_table
+OPTIONS (
+  format = 'PARQUET',
+  uris = ['gs://bucket/data/*'],
+  hive_partition_uri_prefix = 'gs://bucket/data',
+  require_hive_partition_filter = true
+);
+
+—------------------------------------------------------------------------
+
+
+What Are BigQuery Reservations?
+Slots:
+Slots are the basic unit of compute capacity in BigQuery. Each slot is a virtual CPU that can process data in parallel.
+By default, BigQuery uses on-demand pricing, where slots are shared across all users in a multi-tenant environment. This can lead to variable performance during peak usage times.
+Reservations:
+Reservations allow you to purchase and allocate a fixed number of slots exclusively for your organization or specific projects.
+With reservations, you can ensure consistent performance for critical workloads and avoid contention with other users.
+Commitments:
+Reservations are tied to slot commitments, which are purchased for a specific duration (e.g., 1 year or 3 years) at a discounted rate compared to on-demand pricing.
+
