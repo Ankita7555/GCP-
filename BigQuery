@@ -1,24 +1,363 @@
+1. Big Query’s  architecture :
+Big Query’s serverless architecture decouples storage and compute and allows them to scale independently on demand. This structure offers both immense flexibility and cost controls for customers because they don’t need to keep their expensive compute resources up and running all the time. This is very different from traditional node-based cloud data warehouse solutions or on-premise massively parallel processing (MPP) systems. This approach also allows customers of any size to bring their data into the data warehouse and start analyzing their data using Standard SQL without worrying about database operations and system engineering.
+
+Big Query Architecture : 
+> Compute is Dremel, a large multi-tenant cluster that executes SQL queries.
+> Storage is Colossus, Google’s global storage system.
+> Compute and storage talk to each other through the petabit Jupiter network.
+> Big Query is orchestrated via Borg, Google’s precursor to Kubernetes.
+
+==============================================================================================================================
+2. Can you explain the methods available for partitioning tables in Big Query, including their use cases and how to implement each method effectively ?
+In Big Query, partitions are a way to optimize query performance and reduce costs by dividing large tables into smaller, manageable chunks based on specific column values. Here’s how you can set up and work with partitions in Big Query:
+
+Types of Partitions in Big Query:
+1. Time-based Partitioning:
+Day Partitioning: Divides data based on a DATE column.
+Hour Partitioning: Divides data based on a TIMESTAMP column.
+Month Partitioning: Groups data based on a DATE column by month.
+Year Partitioning: Groups data based on a DATE column by year.
+2. Integer Range Partitioning:
+Divides data based on an integer column, useful for scenarios like user IDs or numeric ranges.
+
+3. Ingestion-time Partitioning:
+Automatically partitions data based on the date and time it was ingested into Big Query.
+
+**Unsupported Data Types for Partitioning** : 
+String-based types: STRING, BYTES
+Floating-point types: FLOAT64
+Boolean types: BOOL
+Complex types: ARRAY, STRUCT
+Geospatial types: GEOGRAPHY
+==============================================================================================================================
+
+3.What is Array data type in big query ? — how you will extract data from array (unnest)
+In Big Query, the ARRAY data type is used to store collections of elements (like integers, strings, or even structs). To work with arrays and extract data, Big Query provides the UNNEST function. Here's how to extract data from arrays:
+
+Syntax for UNNEST :UNNEST(array_column) 
+converts an ARRAY into a table-like structure, where each element of the array is returned as a separate row.
+
+Example Scenarios:
+1. Extracting Data from a Simple Array
+Assume you have a table named example_table with the following structure:
+i/p: 1.[1,2,3]
+o/p : 
+1 1
+1 2 
+1 3 
+Query to extract individual array elements:
+SELECT 
+  id, 
+  number 
+FROM 
+  example_table, 
+  UNNEST(numbers) AS number;
+
+i/p:
+1 [[1,2],[3,4]]
+need to unnnest :
+SELECT 
+  id, 
+  element 
+FROM 
+  example_table, 
+  UNNEST(nested_array) AS inner_array, 
+  UNNEST(inner_array) AS element;
+
+
+Aggregate Functions on Arrays:
+BigQuery allows aggregate functions to summarize arrays without unnesting.
+Example:
+Calculate the total sum of array elements:
+SELECT 
+  id, 
+  ARRAY_LENGTH(numbers) AS count, 
+  ARRAY_SUM(numbers) AS total_sum 
+FROM 
+  example_table;
+
+Best Practices
+Use UNNEST only when you need to access individual elements or apply filters.
+Avoid unnecessary unnesting for performance reasons; use array functions like ARRAY_LENGTH, ARRAY_AGG, etc., when possible.
+
+https://medium.com/@krishnusai/big-query-interview-questions-f10a1cbf850a
+==============================================================================================================================
+
+What is record data type in big query? — How will you handle it ?
+The record data type (also known as STRUCT) in BigQuery allows you to define a complex data structure that groups multiple fields (columns) together. It’s like a row within a row, enabling nested data structures.
+
+Key Features of the Record Data Type:
+A record is a single logical unit containing multiple fields (columns).
+Each field within a record can have its own data type, including other records (nested records).
+Commonly used when working with JSON or hierarchical datasets.
+Creating and Using Record Data Types
+
+1. Defining a Table with Records
+You can define a record (STRUCT) directly in your table schema.
+Example Schema:
+CREATE TABLE `project_id.dataset_id.table_name` (
+  id INT64,
+  name STRING,
+  address STRUCT<
+    street STRING,
+    city STRING,
+    zip INT64
+  >
+); - In this example, the address column is a record containing three fields: street, city, and zip.
+How to Handle Record Data :
+1. Accessing Fields in a Record
+To access fields in a record, use the dot (.) notation.
+Example:
+Querying a table with a record column:
+SELECT 
+  id, 
+  name, 
+  address.street, 
+  address.city, 
+  address.zip 
+FROM 
+  `project_id.dataset_id.table_name`;
+o/p table :
+id name street city zip
+
+Best Practices
+Flatten Nested Data: Use UNNEST to flatten arrays of records for easier querying.
+Dot Notation for Simplicity: Access specific fields directly using the dot notation instead of flattening the entire record.
+Choose Records for Hierarchical Data: Use records when your data has a natural hierarchy, like customer details or order items.
+
+==============================================================================================================================
+> How do you insert bulk data into big query table ?
+To insert bulk data into a Big Query table, you have multiple methods depending on the source and use case. Below are common approaches:
+1. Load Data from a Local File
+You can load data into Big Query from files such as CSV, JSON, Avro, Parquet, or ORC.
+Steps:
+Prepare your data file (e.g., data.csv) locally.
+Use the bq command-line tool, the Big Query UI, or the Big Query client library.
+Using the bq Command-line Tool:
+bq load \
+  --source_format=CSV \
+  project_id:dataset_id.table_name \
+  path_to_local_file/data.csv
+
+Using SQL for External File Load:
+LOAD DATA INTO `project_id.dataset_id.table_name` 
+FROM 
+  FILES (
+    format = 'CSV', uris = [ 'gs://your-bucket-name/data.csv' ]
+  );
+
+2.Using the Big Query Console:
+Go to Big Query Console.
+Select your dataset and table.
+Click Upload Data or Load Table.
+Choose the file from your local system or Google Cloud Storage.
+
+3. Load Data from Google Cloud Storage
+If your data resides in Google Cloud Storage (GCS), you can load it directly into Big Query.
+Steps:
+Upload your file to a GCS bucket (if not already there).
+Use the Big Query Console, the bq command-line tool, or SQL.
+Example Using SQL:
+LOAD DATA INTO `project_id.dataset_id.table_name` 
+FROM 
+  FILES (
+    format = 'CSV', uris = [ 'gs://your-bucket-name/data.csv' ]
+  );
+
+4. Use the Big Query Client Library:
+
+DAG:
+from google.cloud import bigquery
+# Construct a BigQuery client object.
+client = bigquery.Client()
+# Define the table ID and file path
+table_id = "project_id.dataset_id.table_name"
+file_path = "path_to_your_file.csv"
+# Configure the load job
+job_config = bigquery.LoadJobConfig(
+    source_format=bigquery.SourceFormat.CSV,
+    skip_leading_rows=1,
+    autodetect=True,
+)
+# Load the file
+with open(file_path, "rb") as source_file:
+    load_job = client.load_table_from_file(source_file, table_id, job_config=job_config)
+# Wait for the load job to complete
+load_job.result()
+print(f"Loaded {load_job.output_rows} rows into {table_id}.")
+
+
+5.Insert Data Using SQL
+For small datasets, you can insert multiple rows using the INSERT statement.
+INSERT INTO `project_id.dataset_id.table_name` (column1, column2, column3) 
+VALUES 
+  ('value1', 'value2', 'value3'), 
+  ('value4', 'value5', 'value6');
+
+
+6.Stream Data in Real-Time
+You can use the Big Query Streaming API for real-time bulk data inserts.
+Python Example :
+from google.cloud import bigquery
+
+client = bigquery.Client()
+rows_to_insert = [
+    {"column1": "value1", "column2": "value2"},
+    {"column1": "value3", "column2": "value4"},
+]
+table_id = "project_id.dataset_id.table_name"
+errors = client.insert_rows_json(table_id, rows_to_insert)
+if errors:
+    print(f"Errors: {errors}")
+else:
+    print("Inserted rows successfully.")
+
+7.Scheduled Data Transfers
+Use Big Query’s Data Transfer Service to schedule recurring data loads from sources like:
+Google Ads, Google Analytics, Campaign Manager, etc.
+Cloud Storage buckets.
+
+8. Airflow GCSTOBQOperator / GCSTOBQ HOOK
+python DAG
+
+Best Practices for Bulk Data Insertion
+1. Batch Insert for Large Data:
+Use bq load or GCS for large datasets.
+Avoid INSERT for millions of rows as it can be inefficient.
+2. Schema Auto-detection:
+Use autodetect=True in the client library or select it in the BigQuery Console.
+3. Optimize File Format:
+Use columnar formats like Parquet or Avro for better performance.
+4. Partition and Cluster Data:
+Design tables with partitions and clustering for long-term efficiency.
+
+
+
+==============================================================================================================================
+
+Handling Regional Differences
+
+If the source and destination datasets are in different regions, you cannot copy the table directly. You need to:
+Export the table to a Google Cloud Storage (GCS) bucket.
+Load the table from the GCS bucket into the destination dataset.
+Step 1: Export Table to GCS
+bq extract --destination_format=CSV project_id:source_dataset.source_table gs://bucket_name/table.csv
+
+Step 2: Load Table from GCS
+bq load --source_format=CSV project_id:destination_dataset.destination_table gs://bucket_name/table.csv
+
+Best Practices
+Permissions: Ensure the service account or user has sufficient permissions for both datasets.
+Source Dataset: Requires roles/bigquery.dataViewer.
+Destination Dataset: Requires roles/bigquery.dataEditor or roles/bigquery.dataOwner.
+
+==============================================================================================================================
+What are the available options for retrieving deleted data from a Big Query table?
+
+1. Recover Data Using Big Query’s Table History:
+a. If the table was deleted, Big Query retains a snapshot of the deleted table for 7 days by default.
+RESTORE TABLE `project_id.dataset_id.table_name` 
+FROM 
+  SNAPSHOT AT TIMESTAMP TIMESTAMP_SUB(
+    CURRENT_TIMESTAMP(), 
+    INTERVAL 1 HOUR
+  );
+
+b. Retrieve Data from the Recycle Bin
+If table recovery is enabled in your project settings, you can directly restore deleted tables from the Recycle Bin within the retention period.
+
+c. Use Table Snapshots
+If you have created table snapshots before the deletion, you can use these snapshots to recover data.
+A table snapshot is a read-only copy of a table that reflects its state at a specific point in time.
+CREATE 
+OR REPLACE TABLE `project_id.dataset_id.new_table` AS 
+SELECT 
+  * 
+FROM 
+  `project_id.dataset_id.snapshot_table`;
+
+d.Use Big Query Time Travel
+Big Query supports time travel, which allows you to query data from a point in the past (up to 7 days by default).
+SELECT 
+  * 
+FROM 
+  `project_id.dataset_id.table_name` FOR SYSTEM_TIME AS OF TIMESTAMP_SUB(
+    CURRENT_TIMESTAMP(), 
+    INTERVAL 1 HOUR
+  );
+
+
+==============================================================================================================================
+
+> How can I join two tables in Big Query located in different regions, where table1 is in region1, table2 is in region2, and both need to be joined using the emp_id field ?
+BigQuery does not allow joining tables directly across different regions because datasets are region-specific and operations cannot span regions. However, there are workarounds to handle this situation:
+
+Approaches to Join Tables Across Regions
+1. Use Big Query’s Query Federation with Temporary Tables:
+You can copy one of the tables from one region to the other region using a temporary table and then perform the join.
+Export table2 from region2 to Google Cloud Storage (GCS).
+Load the data into a temporary table in region1.
+Join the tables in region1.
+
+Step 1: Export table2 to GCS:
+bq extract \
+  --destination_format=CSV \
+  --compression=GZIP \
+  project_id:dataset_region2.table2 \
+  gs://bucket-name/table2.csv.gz
+
+Step 2: Load table2 into a temporary table in region1:
+bq load \
+  --source_format=CSV \
+  project_id:dataset_region1.temp_table2 \
+  gs://bucket-name/table2.csv.gz
+
+Step 3: Perform the Join:
+SELECT 
+  t1.emp_id, 
+  t1.name, 
+  t2.salary 
+FROM 
+  `project_id.dataset_region1.table1` AS t1 
+  JOIN `project_id.dataset_region1.temp_table2` AS t2 ON t1.emp_id = t2.emp_id;
+
+2. Use Big Query Table Copy
+3. Use Big Query Data Transfer Service
+4. Use External Tables
+5. Use Big Query Omni (Multi-Region Join)
+If you are working with Google Cloud’s Big Query Omni, it allows querying data across multiple regions or cloud providers without manual copying.
+
+Choosing the Right Approach
+For One-time Joins: Use temporary tables or export/import using GCS.
+For Regular Joins: Use table copy or Data Transfer Service.
+For Large Datasets: Prefer Big Query Omni or optimized pipelines.
+(Cross region querry : BQ Global query  and BQ Omni - allow this in project seting : enable_gloabal_queries_execution)
+
+==============================================================================================================================
+External Table :
+External tables in BigQuery allow querying data directly from GCS without fully loading the data into BigQuery storage. BigQuery stores only metadata/schema information, while the actual data remains in GCS. This is useful for exploratory analysis, temporary querying, raw data access, and reducing storage duplication.
+
+Actual Cost Behavior
+Component	          Cost
+GCS storage	        YES
+BigQuery storage	  minimal metadata only
+BigQuery query processing	YES
+
+
+
+==============================================================================================================================
+
+
+
 Table types in BQ : 
-
-
-
+Native , view , external table , materialized view  , temp table 
 Quotas and limits 
 
 https://cloud.google.com/bigquery/quotas
 
+BQ Architecture: colosis , dremel execution engine , jupyter network
 
-
-
-
-
-
-
-
-BQ Architecture:
-
-
-
-Partition and Clustering
+Partition and Clustering :
 I want to apply partition on string column which contains date in it,
 But parsing and casting is not allowed in the partition clause.
 
