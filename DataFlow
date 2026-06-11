@@ -1,1 +1,799 @@
+## 1. What is Dataflow?
+**Answer:**
+Dataflow is a fully managed service for stream and batch processing based on Apache Beam.
+
+Architecture:
+Ingests data using Pub/Sub or other sources
+Processes data with Beam transformations
+Outputs data to destinations like BigQuery or Cloud Storage
+
+Use Cases: Real-time fraud detection, IoT data processing, and ETL pipelines
+Google Cloud Dataflow is a fully managed service for batch and stream data processing based on Apache Beam.
+
+It is used to:
+
+* Read data
+* Transform data
+* Validate data
+* Load data into destinations such as BigQuery, GCS, Pub/Sub, etc.
+
+---
+
+## 2. Why Dataflow?
+
+**Answer:**
+
+* Serverless
+* Auto-scaling
+* Batch + Streaming
+* Fault tolerant
+* Integrates with Pub/Sub and BigQuery
+
+---
+
+## 3. What is Apache Beam?
+
+**Answer:**
+
+Apache Beam is the programming framework used to write Dataflow pipelines.
+
+```text
+Apache Beam = Development Framework
+Dataflow = Execution Engine
+```
+
+---
+
+## 4. Explain Dataflow Architecture
+
+```text
+Source
+(Pub/Sub, GCS, BigQuery)
+        ↓
+     Dataflow
+(Transformations)
+        ↓
+Target
+(BigQuery, GCS, Pub/Sub)
+```
+
+---
+
+## 5. Tell me about a Dataflow project.
+
+**Answer:**
+
+> In my GCP project, files and streaming events were ingested through Pub/Sub. Dataflow consumed the data, performed schema validation, deduplication, and business transformations before loading curated data into BigQuery. The solution supported near real-time analytics and automatically scaled based on incoming workload.
+
+---
+
+## 6. Batch vs Streaming Dataflow
+
+| Batch                 | Streaming         |
+| --------------------- | ----------------- |
+| Finite data           | Infinite data     |
+| Historical files      | Real-time events  |
+| Ends after completion | Runs continuously |
+
+Example:
+
+* GCS file → Dataflow → BigQuery = Batch
+* Pub/Sub → Dataflow → BigQuery = Streaming
+
+---
+
+## 7. What is a PCollection?
+
+**Answer:**
+
+PCollection is the main data structure in Apache Beam.
+
+```python
+data = p | ReadFromPubSub()
+```
+
+Data inside Beam pipelines is stored as PCollections.
+
+---
+
+## 8. What are Transforms?
+
+**Answer:**
+
+Transforms are operations applied on data.
+
+Examples:
+
+* Map
+* Filter
+* GroupByKey
+* Combine
+
+Example:
+
+```python
+data | beam.Map(lambda x: x.upper())
+```
+
+---
+
+## 9. What is a DoFn?
+
+**Answer:**
+
+DoFn (Do Function) contains custom business logic.
+
+Example:
+
+```python
+class CleanRecord(beam.DoFn):
+    def process(self, element):
+        yield element.strip()
+```
+
+---
+
+## 10. What is ParDo?
+
+**Answer:**
+
+ParDo applies a DoFn to each element.
+
+```python
+records | beam.ParDo(CleanRecord())
+```
+
+Most common transformation.
+
+---
+
+## 11. How does Dataflow scale?
+
+**Answer:**
+
+Dataflow automatically:
+
+* Adds workers
+* Removes workers
+* Distributes workload
+
+No manual cluster management required.
+
+---
+
+## 12. What is Windowing?
+
+**Answer:**
+
+Streaming data is grouped into windows.
+
+Example:
+
+```text
+Events:
+10:01
+10:02
+10:03
+
+5-minute window
+```
+
+Used for aggregations.
+
+---
+
+## 13. What are Window Types?
+
+### Fixed Window
+
+```text
+10:00-10:05
+10:05-10:10
+```
+
+### Sliding Window
+
+```text
+Every 1 minute
+Last 5 minutes
+```
+
+### Session Window
+
+Based on user activity.
+
+---
+
+## 14. What is Watermark?
+
+**Answer:**
+
+Watermark estimates how complete the stream is.
+
+Used to handle late arriving data.
+
+Interview answer:
+
+> Watermark helps Dataflow determine when a window is complete and when results can be emitted.
+
+---
+
+## 15. What is Late Data?
+
+**Answer:**
+
+Data arriving after its event time window.
+
+Example:
+
+```text
+Event Time = 10:00
+Arrives = 10:10
+```
+
+Handled through watermarks and triggers.
+
+---
+
+## 16. What are Triggers?
+
+**Answer:**
+
+Triggers decide when results are emitted.
+
+Example:
+
+* Every minute
+* End of window
+* After N records
+
+---
+
+## 17. Dataflow vs Dataproc
+
+| Dataflow          | Dataproc        |
+| ----------------- | --------------- |
+| Serverless        | Cluster-based   |
+| Apache Beam       | Spark/Hadoop    |
+| Auto-scaling      | Manage cluster  |
+| Streaming focused | Spark workloads |
+
+Interview answer:
+
+> For managed ETL and streaming workloads, I prefer Dataflow. For Spark migrations and Hadoop workloads, Dataproc is more suitable.
+
+---
+
+## 18. Dataflow vs Spark
+
+**Answer:**
+
+Spark:
+
+* Cluster management
+* More operational overhead
+
+Dataflow:
+
+* Serverless
+* Auto-scaling
+* Fully managed
+
+---
+
+## 19. How do you monitor Dataflow?
+
+**Answer:**
+
+Tools:
+
+* Cloud Monitoring
+* Cloud Logging
+* Dataflow UI
+
+Metrics:
+
+* Worker utilization
+* Throughput
+* Failed records
+* Processing latency
+
+---
+
+## 20. Most Common Scenario Question
+
+**Interviewer:** A Dataflow job is falling behind and Pub/Sub backlog is increasing. What will you do?
+
+**Answer:**
+
+1. Check Dataflow worker utilization.
+2. Review Pub/Sub backlog metrics.
+3. Enable or increase autoscaling.
+4. Check transformation bottlenecks.
+5. Optimize expensive joins/aggregations.
+6. Increase worker machine size if needed.
+7. Review BigQuery write latency.
+
+
+===================set 2 ===============
+
+# 1. What is a Dataflow Template?
+
+**Answer:**
+
+A Dataflow Template is a reusable pipeline definition that can be executed multiple times with different runtime parameters.
+
+Benefits:
+
+* Reusable
+* No code changes
+* Easier deployment
+
+Example:
+
+```text
+Source File = sales.csv
+Target Table = sales_bq
+
+Tomorrow:
+Source File = customer.csv
+Target Table = customer_bq
+```
+
+Same template, different parameters.
+
+---
+
+# 2. Why use Dataflow Templates?
+
+**Answer:**
+
+* Standardized deployments
+* Reusability
+* CI/CD integration
+* Business users can run jobs without code changes
+
+---
+
+# 3. Types of Dataflow Templates?
+
+**Answer:**
+
+### Classic Template
+
+```text
+Pipeline Code
+     ↓
+Template
+     ↓
+Run Job
+```
+
+### Flex Template
+
+```text
+Pipeline Code
+     ↓
+Docker Container
+     ↓
+Template
+     ↓
+Run Job
+```
+
+Flex Templates are the modern approach.
+
+---
+
+# 4. Difference Between Classic and Flex Templates?
+
+| Classic               | Flex                |
+| --------------------- | ------------------- |
+| Limited customization | Highly customizable |
+| No container          | Docker container    |
+| Older                 | Recommended         |
+| Simpler               | More flexible       |
+
+Interview answer:
+
+> We primarily use Flex Templates because they support custom dependencies, Docker packaging, and CI/CD pipelines.
+
+---
+
+# 5. What is a Flex Template?
+
+**Answer:**
+
+A Flex Template packages:
+
+* Beam code
+* Dependencies
+* Runtime environment
+
+inside a Docker image.
+
+```text
+Python Code
+      ↓
+Docker Image
+      ↓
+Flex Template
+      ↓
+Dataflow Job
+```
+
+---
+
+# 6. Why Flex Templates?
+
+**Answer:**
+
+Sometimes pipelines require:
+
+* External libraries
+* Custom Python packages
+* JDBC drivers
+* Proprietary code
+
+Flex Templates package everything together.
+
+---
+
+# 7. How do you deploy a Flex Template?
+
+**Answer:**
+
+```text
+Python Pipeline
+      ↓
+Docker Build
+      ↓
+Artifact Registry
+      ↓
+Create Flex Template
+      ↓
+Launch Job
+```
+
+---
+
+# 8. Where are templates stored?
+
+**Answer:**
+
+Typically:
+
+```text
+GCS Bucket
+```
+
+Example:
+
+```text
+gs://company-dataflow/templates/customer_template
+```
+
+---
+
+# 9. How are runtime parameters passed?
+
+**Answer:**
+
+Example:
+
+```text
+inputFile=gs://data/customer.csv
+
+outputTable=project.dataset.customer
+```
+
+Parameters are passed when launching the job.
+
+---
+
+# 10. What are common runtime parameters?
+
+**Answer:**
+
+* Input file path
+* Output table
+* Project ID
+* Dataset
+* Topic name
+* Subscription name
+
+---
+
+# 11. Explain Dataflow CI/CD Process.
+
+**Answer:**
+
+```text
+GitHub
+   ↓
+Cloud Build
+   ↓
+Docker Image
+   ↓
+Artifact Registry
+   ↓
+Flex Template
+   ↓
+Dataflow Deployment
+```
+
+---
+
+# 12. How do you schedule Dataflow jobs?
+
+**Answer:**
+
+Usually through:
+
+* Cloud Composer (Airflow)
+* Cloud Scheduler
+* Event-driven Pub/Sub triggers
+
+---
+
+# 13. How does Composer trigger Dataflow?
+
+**Answer:**
+
+Airflow DAG uses:
+
+```python
+DataflowStartFlexTemplateOperator
+```
+
+to launch Dataflow jobs.
+
+---
+
+# 14. What is the DataflowStartFlexTemplateOperator?
+
+**Answer:**
+
+Airflow operator that starts a Flex Template Dataflow job.
+
+Common in production.
+
+---
+
+# 15. What worker types have you used?
+
+**Answer:**
+
+Examples:
+
+```text
+n1-standard-4
+n1-standard-8
+e2-standard-4
+```
+
+Chosen based on workload.
+
+---
+
+# 16. What is Autoscaling?
+
+**Answer:**
+
+Dataflow automatically adds/removes workers based on workload.
+
+Example:
+
+```text
+Start = 3 workers
+Peak = 20 workers
+Back to 3 workers
+```
+
+---
+
+# 17. What is Shuffle in Dataflow?
+
+**Answer:**
+
+Shuffle redistributes data between workers.
+
+Occurs during:
+
+* GroupByKey
+* Joins
+* Aggregations
+
+Large shuffles are expensive.
+
+---
+
+# 18. How do you optimize Dataflow performance?
+
+**Answer:**
+
+* Filter early
+* Reduce shuffles
+* Partition large datasets
+* Use autoscaling
+* Increase worker size
+* Use efficient schemas
+
+---
+
+# 19. What causes slow Dataflow jobs?
+
+**Answer:**
+
+* Large joins
+* Data skew
+* Too many small files
+* Worker resource limits
+* BigQuery bottlenecks
+
+---
+
+# 20. What is Data Skew?
+
+**Answer:**
+
+Uneven data distribution.
+
+Example:
+
+```text
+Customer A = 10 million records
+Customer B = 10 records
+```
+
+One worker gets overloaded.
+
+---
+
+# 21. How do you troubleshoot failed Dataflow jobs?
+
+**Answer:**
+
+1. Check Dataflow UI
+2. Check worker logs
+3. Check Cloud Logging
+4. Verify permissions
+5. Review failed transforms
+6. Check resource utilization
+
+---
+
+# 22. What IAM roles are needed?
+
+**Answer:**
+
+Common roles:
+
+* Dataflow Admin
+* Dataflow Worker
+* Storage Admin
+* BigQuery Data Editor
+* Pub/Sub Subscriber
+
+---
+
+# 23. Scenario Question
+
+**Interviewer:** A file lands in GCS. How do you load it into BigQuery automatically?
+
+**Answer:**
+
+```text
+GCS
+ ↓
+Pub/Sub Notification
+ ↓
+Cloud Composer
+ ↓
+Dataflow Flex Template
+ ↓
+BigQuery
+```
+
+The Dataflow template receives the file path as a runtime parameter and loads it into BigQuery.
+
+---
+
+# 24. Scenario Question
+
+**Interviewer:** Why not use Airflow for transformations instead of Dataflow?
+
+**Answer:**
+
+> Airflow is an orchestration tool and is not designed for large-scale distributed processing. Dataflow performs parallel transformations, autoscaling, and streaming processing much more efficiently. Airflow should orchestrate, while Dataflow should process.
+
+These template, Flex Template, Composer-triggered Dataflow, autoscaling, and troubleshooting questions are among the most frequently asked GCP Data Engineer interview topics.
+
+# 25.Real project use:
+You can explain it like this:
+
+In one of my GCP migration projects, sensitive data needed to be encrypted before loading into downstream systems. We used a pre-built Dataflow template for encryption. Cloud Composer (Airflow) orchestrated the workflow and passed runtime parameters such as input file location, output location, encryption configuration, and project details to the Dataflow template. Dataflow processed the data in a distributed manner, encrypted the required fields, and wrote the encrypted output for further processing.
+This is one of the most common senior Data Engineer Dataflow questions.
+
+NiFi / GCS
+     ↓
+BigQuery Stage
+     ↓
+Composer DAG
+     ↓
+Dataflow Encryption Template
+     ↓
+BigQuery Secure Layer
+     ↓
+SCD1 / SCD2 Transformations
+     ↓
+Business Tables
+     ↓
+Tableau / Reporting
+
+Q: What parameters were passed to the template?
+Answer:
+Input file path
+Output file path
+Project ID
+Service account
+KMS key/encryption configuration
+Environment-specific settings (dev, pre-prod, prod)
+
+
+> Sample Dataflow Template :Sample Airflow DAG Triggering Dataflow Template
+
+from airflow import DAG
+from airflow.providers.google.cloud.operators.dataflow import DataflowStartFlexTemplateOperator
+
+encrypt_job = DataflowStartFlexTemplateOperator(
+    task_id="encrypt_file",
+    project_id="my-project",
+    location="us-central1",
+
+    body={
+        "launchParameter": {
+            "jobName": "encrypt-job",
+
+            "containerSpecGcsPath":
+            "gs://templates/encryption-template.json",
+
+            "parameters": {
+                "inputFile":
+                "gs://raw-bucket/customer.csv",
+
+                "outputFile":
+                "gs://encrypted-bucket/customer.csv",
+
+                "kmsKey":
+                "projects/client-project/locations/us/keyRings/prod/cryptoKeys/pii-key"
+            }
+        }
+    }
+)
+
+
+
+Achieve Reusability : Store parameter json or key-value pair file in gcs bucket
+To make the solution reusable across datasets, I created a parameterized Dataflow template instead of hardcoding dataset or table names. The template accepted runtime parameters such as source dataset, source table, target dataset, target table, columns to encrypt, and the KMS key reference. Cloud Composer read these values from a configuration file/table and passed them to the Dataflow job at runtime. This allowed us to use the same template for multiple datasets and environments (dev, pre-prod, prod) without modifying the code, reducing maintenance effort and ensuring consistent encryption logic across all pipelines.
+
+
+> A Dataflow job is slow. How do you troubleshoot?
+Answer:
+Check Dataflow UI
+Review worker utilization
+Check for skewed keys
+Review expensive joins
+Check BigQuery write bottlenecks
+Review logs and failed transforms
+Scale workers if necessary
+
+
+
+
+
+
+
+
+
 
