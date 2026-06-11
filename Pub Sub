@@ -1,1 +1,160 @@
+==================== Key Concepts ==================
+>Topic : It is a named resource to which publishers send messages.
+> Subscription : Is a named resource representing the stream of messages from a specific topic, to be sent to the subscribing application.
+> Message : The combination of data and attributes that a publisher sends to a topic and is eventually sent to subscribers.
+> Message attribute : A key-value pair that a publisher can define for a message.
+
+2. Differentiate between Push and Pull delivery mechanisms.
+Pull: The subscriber application actively initiates requests to the Pub/Sub server to retrieve messages. It is ideal for high-throughput batching or when consumers are behind a firewall. 
+
+Push: The Pub/Sub server automatically delivers messages via an HTTP POST request to a configured webhook URL. It is best suited for serverless targets like Google Cloud Functions or Google Cloud Run. 
+
+
+=================   Publisher-subscriber relationships  =============
+A publisher application creates and sends messages to a topic.
+Subscriber applications then create a subscription to a topic to receive messages from the topic.
+Communication can be:
+one-to-many
+many-to-one
+many-to-many
+
+===================== Pricing ================
+Pub/Sub pricing is calculated based upon monthly data volumes:
+Message ingestion and delivery
+Snapshots and retained acknowledged messages
+The first 10 GB of data per month is offered free of charge.
+
+1. What is the Publish-Subscribe pattern and why is it important?
+It’s a messaging pattern where senders (publishers) send messages without targeting specific receivers, and receivers (subscribers) listen for messages of interest.
+
+2. How does the Pub-Sub model differ from the Request-Response model?
+In Pub-Sub, publishers and subscribers are decoupled, while in Request-Response, the requester waits for a response from the responder.
+
+3. How do you ensure message ordering in a Pub-Sub system?
+Use ordered queues, sequence numbers, or systems that inherently support ordering like Apache Kafka’s partitions.
+
+4. How can you filter messages in a Pub-Sub system?
+Use topic-based filtering, content-based filtering, or systems that support native filtering like Google Cloud Pub/Sub.
+
+5. What is a Dead-Letter Topic, and why is it used?
+Answer: It is a fallback topic designed to catch messages that fail to process successfully.
+Mechanism: If a subscriber fails to acknowledge a message multiple times (exceeding the maximum delivery attempts), Pub/Sub routes that message to the dead-letter topic to prevent infinite retries and pipeline blockages.
+
+6. Does Pub/Sub guarantee message order?
+Answer: By default, message delivery order is not guaranteed.
+Configuration: You can enable Ordering Keys. When an ordering key is attached to messages, Pub/Sub guarantees that messages with the exact same key are delivered to subscribers in the order they were published.
+
+
+7. Explain the default delivery guarantees of Pub/Sub. Can we achieve Exactly-Once?
+Default: It guarantees At-least-once delivery. Redundancy over the global network means a message might occasionally be delivered more than once. 
+
+Exactly-Once: Yes, it can be explicitly enabled on a subscription. Pub/Sub will filter out duplicate deliveries within a region, though your application should still be designed as idempotent to protect against extreme edge cases.
+
+8. How do you handle message payloads that exceed the maximum size limit?
+Limit: The maximum hard limit for a single Pub/Sub message payload is 10MB. 
+OneUptime Solution: Implement the Claim Check Pattern.
+Upload the heavy file to a Google Cloud Storage bucket.
+Publish a Pub/Sub message containing only the object's reference metadata and URI path.
+The subscriber reads the path from the message and downloads the actual payload directly from storage.
+
+9. What is the ACK Deadline?
+Answer: The amount of time a subscriber has to acknowledge a message.
+Default: 10 seconds
+Maximum: 600 seconds
+
+10. How do you handle duplicate messages?
+Answer:
+Store unique message IDs and ignore duplicates.
+Example:
+if message_id in processed_messages:
+    skip
+Alternatively use:
+BigQuery MERGE
+Primary keys
+Deduplication logic
+
+11. What is Message Retention?
+Answer: Pub/Sub stores unacknowledged messages for a configurable period.
+Maximum: 31 days
+
+12. What are Ordering Keys?
+Answer: Ordering keys guarantee message order within the same key.
+Example: Customer A:
+Order Created
+Order Updated
+Order Delivered
+Messages arrive in the same sequence.
+
+
+13. How does Pub/Sub scale?
+Answer:
+Pub/Sub automatically scales horizontally.
+Benefits:
+No server management
+Millions of messages per second
+Automatic load balancing
+
+14. How do you monitor Pub/Sub?
+Answer: Monitor: Backlog size , Unacknowledged messages , Publish rate , Delivery latency  , Subscriber throughput
+Using: Cloud Monitoring and Cloud Logging
+
+15. pub/sub v/s kafka : I prefer Pub/Sub in GCP-native environments because it eliminates broker management and provides automatic scaling.
+| Pub/Sub           | Kafka             |
+| ----------------- | ----------------- |
+| Fully managed     | Self-managed      |
+| Auto scaling      | Manual scaling    |
+| No infrastructure | Broker management |
+| GCP native        | Multi-cloud       |
+
+
+16 .Project Architecture :
+Source Applications / APIs
+            │
+            ▼
+        Pub/Sub Topic
+            │
+            ▼
+       Dataflow Pipeline
+      (Validation, Parsing,
+      Data Quality Checks)
+            │
+            ▼
+     Cloud Storage (Raw)
+            │
+            ▼
+         BigQuery
+      (Curated Tables)
+            │
+            ▼
+     Looker / Tableau
+
+
+> Your Responsibilities: Created and managed Pub/Sub topics and subscriptions.
+Configured Dataflow pipelines to consume Pub/Sub messages.
+Implemented message validation and error handling.
+Monitored message backlog and pipeline health using Cloud Monitoring.
+Optimized BigQuery loading for near real-time analytics.
+
+> Why Pub/Sub?
+Asynchronous communication
+Handles spikes automatically
+At-least-once delivery
+Fully managed service
+Integrates natively with Dataflow and BigQuery
+
+Another project exmaple :
+In one of my GCP projects, files arrived in Cloud Storage in near real time. A notification was published to Pub/Sub whenever a new file landed. Dataflow subscribed to the Pub/Sub topic, processed and validated the file, applied business transformations, and loaded the data into BigQuery. This event-driven architecture reduced latency and eliminated the need for constant polling.
+
+Source System
+      ↓
+GCS (file lands)
+      ↓
+Pub/Sub Notification
+      ↓
+Dataflow / Cloud Function
+      ↓
+BigQuery
+
+
+
 
