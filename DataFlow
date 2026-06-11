@@ -789,8 +789,18 @@ Review logs and failed transforms
 Scale workers if necessary
 
 
+> What alternatives have you used instead of Dataflow?
+The choice depends on the use case. For GCP-native serverless ETL and streaming workloads, I prefer Dataflow. For Spark-based processing and Hadoop migrations, Dataproc is a common alternative. For simple transformations, BigQuery SQL may be sufficient, while Kafka Streams or Flink are often used for specialized real-time streaming requirements.
 
-
+| Tool          | Best For                    |
+| ------------- | --------------------------- |
+| Dataflow      | Serverless ETL & Streaming  |
+| Dataproc      | Spark/Hadoop workloads      |
+| Spark         | Large-scale transformations |
+| Flink         | Advanced streaming          |
+| Kafka Streams | Event processing            |
+| BigQuery SQL  | Simple ELT                  |
+| Airflow       | Orchestration               |
 
 
 
