@@ -386,8 +386,6 @@ CREATE TABLE `fluted-union-448405-a7.test.test_table_1`
 PARTITION BY partition_date;
 
 
-
-
 Types of partitioning
 Integer range partitioning
 
@@ -400,16 +398,11 @@ CREATE TABLE `fluted-union-448405-a7.test.part_4`
 )
 PARTITION BY RANGE_BUCKET(sale_id, GENERATE_ARRAY(0, 100, 10));
 
-
-
-
 INSERT INTO `fluted-union-448405-a7.test.part_4` (sale_id, sale_date, product, amount)
 VALUES
   (5, '2023-10-01', 'Product A', 100.0),
   (15, '2023-10-01', 'Product B', 200.0),
   (25, '2023-10-02', 'Product C', 150.0);
-
-
 
 
 SELECT *
