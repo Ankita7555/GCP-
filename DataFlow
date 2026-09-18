@@ -83,9 +83,7 @@ Example:
 ---
 
 ## 7. What is a PCollection?
-
 **Answer:**
-
 PCollection is the main data structure in Apache Beam.
 
 ```python
